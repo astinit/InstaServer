@@ -1,0 +1,11 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/InstaServer
+/InstaClient/bin/Debug/netcoreapp3.1
+/InstaClient/obj
+/InstaServer/bin
+/InstaServer/obj
+/InstaServer/Properties/PublishProfiles
+/InstaServer/Properties/ServiceDependencies

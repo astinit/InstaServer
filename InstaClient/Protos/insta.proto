@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+option csharp_namespace = "InstaServer";
+
+package InstaServer;
+
+// The service definition.
+service Insta {
+  rpc GetPageData (PageLink) returns (PageData);
+}
+
+message PageLink {
+  string link = 1;
+}
+
+message PageData {
+  MediaType pageMediaType = 1;
+  string postText = 2;
+  repeated PageItem pageItems = 3;
+}
+
+message PageItem {
+  MediaType itemMediaType = 1;
+  string link = 2;
+  string file = 3;
+  repeated string tags = 4;
+}
+
+enum MediaType {
+  Undefined = 0;
+  Image = 1;
+  Video = 2;
+  Carousel = 3;
+  IGTV = 4;
+  Reel = 5;
+}
+
+enum LinkType {
+  U = 0;
+  T = 1;
+  R = 2;
+  P = 3;
+}
