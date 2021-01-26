@@ -1,7 +1,7 @@
 ﻿using Grpc.Core;
 using InstaServer.BLL;
 using InstaServer.BLL.Helpers;
-using InstaServer.BLL.Models;
+using InstaServer.BLL.Core;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -22,11 +22,20 @@ namespace InstaServer.Services
             bool isLink = Uri.IsWellFormedUriString(request.Link, UriKind.Absolute);
             if (!isLink)
             {
-                //TODO Throw exception
-                return null;
+                return new PageData() { Error = Error.UrlException };
             }
             var parserWorker = new ParserWorker<PageData>(new InstaParser(), new InstaParserSettings() { Url = request.Link });
             return await parserWorker.DoWork();
+        }
+
+        public override async Task<FileLoadResponse> GetFiles(FileLoadRequest request, ServerCallContext context)
+        {
+            bool isLinks = !request.Links.Any(l => !Uri.IsWellFormedUriString(l, UriKind.Absolute));
+            if (!isLinks)
+            {
+                return new FileLoadResponse() { Error = Error.UrlException };
+            }
+            return await FileLoader.GetFileLoadResponse(request.Links);
         }
     }
 }

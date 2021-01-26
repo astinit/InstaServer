@@ -39,7 +39,7 @@ namespace InstaServer.BLL.Helpers
         public LinkType GetLinkType(string link)
         {
             var uri = new Uri(link);
-            if(uri.Segments.Count() > 1)
+            if(uri.Segments.Count() > 1 && uri.Host == Constants.InstagramHost)
             {
                 var currentLinkType = uri.Segments[1].Replace("/", "");
                 if (!string.IsNullOrEmpty(currentLinkType) && LinkTypes.ContainsKey(currentLinkType))
@@ -71,5 +71,7 @@ namespace InstaServer.BLL.Helpers
         private static MediaType DefineTVLinkMediaType(IDocument document) => MediaType.Igtv;
         private static MediaType SetUndefinedMediaType(IDocument document) => MediaType.Undefined;
 
+        public bool IsPrivateAccount(IDocument document) => document.GetElementByClassName("rkEop") != null;
+        public bool NeedAuth(IDocument document) => document.GetElementById("loginForm") != null;
     }
 }

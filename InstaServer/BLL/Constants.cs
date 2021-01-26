@@ -12,7 +12,10 @@ namespace InstaServer.BLL
         public const string UserName = "uggamesstudio@gmail.com";
         public const string Password = "uggstudio2014";
 
-        public const string LoginUrl = "https://www.instagram.com/accounts/login/";
-        public const string BaseUrl = "https://www.instagram.com";
+        public const string InstagramLoginUrl = "https://www.instagram.com/accounts/login/";
+        public const string BaseInstagramUrl = "https://www.instagram.com";
+        public const string InstagramHost = "www.instagram.com";
+
+        public const string SessionIdCookieName = "sessionid";
     }
 }

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace InstaServer.BLL.Models
+namespace InstaServer.BLL.Core
 {
     public class InstaParserSettings : IParserSettings
     {

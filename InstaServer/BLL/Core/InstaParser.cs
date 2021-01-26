@@ -1,4 +1,5 @@
-﻿using DotNetBrowser.Dom;
+﻿using DotNetBrowser.Browser;
+using DotNetBrowser.Dom;
 using Google.Protobuf.Collections;
 using InstaServer.BLL.Helpers;
 using InstaServer.BLL.Interfaces;
@@ -6,59 +7,74 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 
-namespace InstaServer.BLL.Models
+namespace InstaServer.BLL.Core
 {
     public class InstaParser : IParser<PageData>
     {
-        private Dictionary<MediaType, Func<IDocument, IParserSettings, Task<PageData>>> FunctionsParsingMediaType { get; }
+        private readonly ILogger<InstaParser> _logger;
+        private readonly Dictionary<MediaType, Func<IDocument, IParserSettings, Task<PageData>>> _functionsParsingMediaType;
         public InstaParser()
-        => FunctionsParsingMediaType = new Dictionary<MediaType, Func<IDocument, IParserSettings, Task<PageData>>>()
+        {
+            var loggerFactory = LoggerFactory.Create(builder => builder.AddEventLog());
+            _logger = loggerFactory.CreateLogger<InstaParser>();
+            _functionsParsingMediaType = new Dictionary<MediaType, Func<IDocument, IParserSettings, Task<PageData>>>()
             {
                 { MediaType.Image, GetImagePageData },
                 { MediaType.Carousel, GetCarouselPageData },
                 { MediaType.Video, GetVideoPageData },
                 { MediaType.Reel, GetReelPageData  },
                 { MediaType.Igtv, GetIGTVPageData  },
-                { MediaType.Undefined, GetEmptyPageData  },
             };
+        }
+
+        public bool NeedAuth(IDocument document) => document.GetElementById("loginForm") != null;
 
         public async Task<PageData> ParseAsync(IDocument document, IParserSettings settings)
         {
+            var pageData = new PageData();
             var instaParserHelper = new InstaParserHelper<PageData>();
-            //if (HtmlLoader.NeedAuth(document))
-            //{
-            //    var uri = new Uri(settings.Url);
-            //    settings.Url = Constants.BaseUrl + HttpUtility.ParseQueryString(uri.Query).Get("next");
-            //    await HtmlLoader.SignIn(document, settings.Url);
-            //}
             var currentLinkType = instaParserHelper.GetLinkType(settings.Url);
-            var mediaType = instaParserHelper.FunctionsMediaTypeDefinition[currentLinkType].Invoke(document);
-            try
+            if (instaParserHelper.IsPrivateAccount(document))
             {
-                var pageData = await FunctionsParsingMediaType[mediaType].Invoke(document, settings);
-                if(mediaType != MediaType.Undefined)
+                pageData.Error = Error.PrivateAccountException;
+            }
+            else if (instaParserHelper.NeedAuth(document))
+            {
+                pageData.Error = Error.AuthException;
+            }
+            else if (currentLinkType == LinkType.U)
+            {
+                pageData.Error = Error.UrlException;
+            }
+            else
+            {
+                var mediaType = instaParserHelper.FunctionsMediaTypeDefinition[currentLinkType].Invoke(document);
+                try
                 {
-                    var decodedHtml = HttpUtility.HtmlDecode(GetMainText(document)).Replace("<br>", "\n");
-                    pageData.PostText = Regex.Replace(decodedHtml, "<[^>]+>", string.Empty);
-                    var hashtags = Regex.Matches(@"^#\D*", pageData.PostText).Select(mc => mc.Value).ToArray();
+                    if (mediaType != MediaType.Undefined)
+                    {
+                        pageData = await _functionsParsingMediaType[mediaType].Invoke(document, settings);
+                        var decodedHtml = HttpUtility.HtmlDecode(GetMainText(document)).Replace("<br>", "\n");
+                        pageData.PostText = Regex.Replace(decodedHtml, "<[^>]+>", string.Empty);
+                        //var hashtags = Regex.Matches(@"^#\D*", pageData.PostText).Select(mc => mc.Value).ToArray();
+                    }
                 }
-                return pageData;
+                catch (Exception ex)
+                {
+                    _logger.LogError(JsonConvert.SerializeObject(ex));
+                    _logger.LogInformation(document.Frame.Html);
+                    pageData.Error = Error.InternalServerException;
+                }
             }
-            catch (Exception ex)
-            {
-                //TODO: log error
-                var loggerFactory = LoggerFactory.Create(builder => builder.AddEventLog());
-                var logger = loggerFactory.CreateLogger<InstaParser>();
-                logger.LogError(JsonConvert.SerializeObject(ex));
-                logger.LogInformation(document.Frame.Html);
-                return null;
-            }
+            return pageData;
         }
 
         private async Task<PageData> GetImagePageData(IDocument document, IParserSettings settings)
@@ -67,7 +83,7 @@ namespace InstaServer.BLL.Models
             pageData.PageItems.Add(new PageItem() { ItemMediaType = MediaType.Image });
             pageData.PageItems[0].Link = GetImageElement(document, Constants.ImageKeyWord).Attributes["src"];
             GetImageTags(document, pageData.PageItems[0].Tags);
-            pageData.PageItems[0].File = await GetEncodedFiles(pageData.PageItems[0].Link);
+            pageData.PageItems[0].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[0].Link);
             return pageData;
         }
 
@@ -77,7 +93,7 @@ namespace InstaServer.BLL.Models
             pageData.PageItems.Add(new PageItem() { ItemMediaType = MediaType.Video });
             pageData.PageItems[0].Link = GetVideoElement(document).Attributes["src"];
             GetVideoTags(document, document, pageData.PageItems[0].Tags);
-            pageData.PageItems[0].File = await GetEncodedFiles(pageData.PageItems[0].Link);
+            pageData.PageItems[0].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[0].Link);
             return pageData;
         }
         private async Task<PageData> GetIGTVPageData(IDocument document, IParserSettings settings)
@@ -86,7 +102,7 @@ namespace InstaServer.BLL.Models
             pageData.PageItems.Add(new PageItem() { ItemMediaType = MediaType.Igtv });
             pageData.PageItems[0].Link = GetVideoElement(document).Attributes["src"];
             GetVideoTags(document, document, pageData.PageItems[0].Tags);
-            pageData.PageItems[0].File = await GetEncodedFiles(pageData.PageItems[0].Link);
+            pageData.PageItems[0].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[0].Link);
             return pageData;
         }
         private async Task<PageData> GetReelPageData(IDocument document, IParserSettings settings)
@@ -95,7 +111,7 @@ namespace InstaServer.BLL.Models
             pageData.PageItems.Add(new PageItem() { ItemMediaType = MediaType.Reel });
             pageData.PageItems[0].Link = GetVideoElement(document).Attributes["src"];
             GetVideoTags(document, document, pageData.PageItems[0].Tags);
-            pageData.PageItems[0].File = await GetEncodedFiles(pageData.PageItems[0].Link);
+            pageData.PageItems[0].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[0].Link);
             return pageData;
         }
         private async Task<PageData> GetCarouselPageData(IDocument document, IParserSettings settings)
@@ -126,27 +142,21 @@ namespace InstaServer.BLL.Models
             {
                 var element = GetImageElement(carouselItem, Constants.CarouselImageKeyWord);
                 pageData.PageItems.Add(new PageItem());
-                if(element != null)
+                if (element != null)
                 {
-                    pageData.PageItems[i].Link = element.Attributes["src"];
                     pageData.PageItems[i].ItemMediaType = MediaType.Image;
                     GetImageTags(carouselItem, pageData.PageItems[i].Tags);
                 }
                 else
                 {
                     element = GetVideoElement(carouselItem);
-                    pageData.PageItems[i].Link = element.Attributes["src"];
                     pageData.PageItems[i].ItemMediaType = MediaType.Video;
                     GetVideoTags(document, carouselItem, pageData.PageItems[i].Tags);
                 }
-                pageData.PageItems[i].File = await GetEncodedFiles(pageData.PageItems[i].Link);
+                pageData.PageItems[i].Link = element.Attributes["src"];
+                pageData.PageItems[i].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[i].Link);
                 i++;
             }
-            return pageData;
-        }
-        private async Task<PageData> GetEmptyPageData(IDocument document, IParserSettings settings)
-        {
-            var pageData = new PageData() { PageMediaType = MediaType.Undefined };
             return pageData;
         }
 
@@ -176,13 +186,6 @@ namespace InstaServer.BLL.Models
             var mainTextContainer = document.GetElementByClassName(Constants.MainTextContainerKeyWord);
             mainText = mainTextContainer.GetElementsByTagName("span").FirstOrDefault(span => string.IsNullOrEmpty(span.Attributes["class"])).InnerHtml;
             return mainText;
-        }
-
-        private async Task<string> GetEncodedFiles(string link)
-        {
-            using var httpClient = new HttpClient();
-            var file = await httpClient.GetByteArrayAsync(link);
-            return Convert.ToBase64String(file);
         }
 
         private void GetImageTags(INode node, IList<string> tags)

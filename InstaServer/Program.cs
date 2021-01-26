@@ -15,7 +15,7 @@ namespace InstaServer
     {
         public static void Main(string[] args)
         {
-            HtmlLoader.InitEngine();
+            BrowserManager.InitEngine();
             CreateHostBuilder(args).Build().Run();
         }
 

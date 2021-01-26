@@ -7,16 +7,27 @@ package InstaServer;
 // The service definition.
 service Insta {
   rpc GetPageData (PageLink) returns (PageData);
+  rpc GetFiles (FileLoadRequest) returns (FileLoadResponse);
 }
 
 message PageLink {
   string link = 1;
 }
 
+message FileLoadRequest {
+	repeated string links = 1;
+}
+
+message FileLoadResponse {
+	repeated string files = 1;
+	Error error = 2;
+}
+
 message PageData {
   MediaType pageMediaType = 1;
   string postText = 2;
   repeated PageItem pageItems = 3;
+  Error error = 4;
 }
 
 message PageItem {
@@ -40,4 +51,12 @@ enum LinkType {
   T = 1;
   R = 2;
   P = 3;
+}
+
+enum Error {
+	None = 0;
+	UrlException = 1;
+	InternalServerException = 2;
+	PrivateAccountException = 3;
+	AuthException = 4;
 }
