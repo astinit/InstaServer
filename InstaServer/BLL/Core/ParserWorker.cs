@@ -30,13 +30,7 @@ namespace InstaServer.BLL.Core
         public async Task<T> DoWork()
         {
             var document = await GetHtmlDocument();
-            if (Parser.NeedAuth(document))
-            {
-                //TODO: Send respone about login needed
-                //var uri = new Uri(_parserSettings.Url);
-                //_parserSettings.Url = Constants.BaseUrl + HttpUtility.ParseQueryString(uri.Query).Get("next");
-            }
-            return await Parser.ParseAsync(document, ParserSettings);
+            return Parser.Parse(document, ParserSettings);
         }
     }
 }

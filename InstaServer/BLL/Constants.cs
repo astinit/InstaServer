@@ -1,4 +1,6 @@
 ﻿
+using System.IO;
+
 namespace InstaServer.BLL
 {
     public static class Constants
@@ -16,6 +18,6 @@ namespace InstaServer.BLL
         public const string BaseInstagramUrl = "https://www.instagram.com";
         public const string InstagramHost = "www.instagram.com";
 
-        public const string SessionIdCookieName = "sessionid";
+        public static readonly string LogPath = Path.Combine(Directory.GetCurrentDirectory(), "log.txt");
     }
 }

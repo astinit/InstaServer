@@ -72,6 +72,10 @@ namespace InstaServer.BLL.Helpers
         private static MediaType SetUndefinedMediaType(IDocument document) => MediaType.Undefined;
 
         public bool IsPrivateAccount(IDocument document) => document.GetElementByClassName("rkEop") != null;
-        public bool NeedAuth(IDocument document) => document.GetElementById("loginForm") != null;
+        public bool NeedAuth(IDocument document)
+        {
+            var uri = new Uri(document.BaseUri);
+            return document.GetElementById("loginForm") != null || (uri.Segments.Any(s => s.Replace("/", "") == "accounts") && uri.Segments.Any(s => s.Replace("/", "") == "login"));
+        }
     }
 }

@@ -33,7 +33,7 @@ message PageData {
 message PageItem {
   MediaType itemMediaType = 1;
   string link = 2;
-  string file = 3;
+  //string file = 3;
   repeated string tags = 4;
 }
 

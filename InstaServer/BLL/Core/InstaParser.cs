@@ -3,6 +3,7 @@ using DotNetBrowser.Dom;
 using Google.Protobuf.Collections;
 using InstaServer.BLL.Helpers;
 using InstaServer.BLL.Interfaces;
+using InstaServer.Logging;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -12,6 +13,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -20,12 +22,12 @@ namespace InstaServer.BLL.Core
     public class InstaParser : IParser<PageData>
     {
         private readonly ILogger<InstaParser> _logger;
-        private readonly Dictionary<MediaType, Func<IDocument, IParserSettings, Task<PageData>>> _functionsParsingMediaType;
+        private readonly Dictionary<MediaType, Func<IDocument, IParserSettings, PageData>> _functionsParsingMediaType;
         public InstaParser()
         {
-            var loggerFactory = LoggerFactory.Create(builder => builder.AddEventLog());
+            var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole()).AddFile(Constants.LogPath);
             _logger = loggerFactory.CreateLogger<InstaParser>();
-            _functionsParsingMediaType = new Dictionary<MediaType, Func<IDocument, IParserSettings, Task<PageData>>>()
+            _functionsParsingMediaType = new Dictionary<MediaType, Func<IDocument, IParserSettings, PageData>>()
             {
                 { MediaType.Image, GetImagePageData },
                 { MediaType.Carousel, GetCarouselPageData },
@@ -37,22 +39,22 @@ namespace InstaServer.BLL.Core
 
         public bool NeedAuth(IDocument document) => document.GetElementById("loginForm") != null;
 
-        public async Task<PageData> ParseAsync(IDocument document, IParserSettings settings)
+        public PageData Parse(IDocument document, IParserSettings settings)
         {
             var pageData = new PageData();
             var instaParserHelper = new InstaParserHelper<PageData>();
             var currentLinkType = instaParserHelper.GetLinkType(settings.Url);
-            if (instaParserHelper.IsPrivateAccount(document))
+            if (currentLinkType == LinkType.U)
             {
-                pageData.Error = Error.PrivateAccountException;
+                pageData.Error = Error.UrlException;
             }
             else if (instaParserHelper.NeedAuth(document))
             {
                 pageData.Error = Error.AuthException;
             }
-            else if (currentLinkType == LinkType.U)
+            else if (instaParserHelper.IsPrivateAccount(document))
             {
-                pageData.Error = Error.UrlException;
+                pageData.Error = Error.PrivateAccountException;
             }
             else
             {
@@ -61,10 +63,24 @@ namespace InstaServer.BLL.Core
                 {
                     if (mediaType != MediaType.Undefined)
                     {
-                        pageData = await _functionsParsingMediaType[mediaType].Invoke(document, settings);
-                        var decodedHtml = HttpUtility.HtmlDecode(GetMainText(document)).Replace("<br>", "\n");
-                        pageData.PostText = Regex.Replace(decodedHtml, "<[^>]+>", string.Empty);
-                        //var hashtags = Regex.Matches(@"^#\D*", pageData.PostText).Select(mc => mc.Value).ToArray();
+                        pageData = _functionsParsingMediaType[mediaType].Invoke(document, settings);
+                        var mainText = GetMainText(document);
+                        if (!string.IsNullOrWhiteSpace(mainText))
+                        {
+                            var decodedHtml = HttpUtility.HtmlDecode(mainText).Replace("<br>", "\n");
+                            pageData.PostText = Regex.Replace(decodedHtml, "<[^>]+>", string.Empty);
+                            //var hashtags = Regex.Matches(@"^#\D*", pageData.PostText).Select(mc => mc.Value).ToArray();
+                        }
+                        //foreach (var item in pageData.PageItems)
+                        //{
+                        //    item.File = await FileLoader.GetEncodedFileAsync(item.Link);
+                        //}
+                    }
+                    else
+                    {
+                        _logger.LogError("MediaType undefined for url -" + settings.Url);
+                        _logger.LogInformation(document.Frame.Html);
+                        pageData.Error = Error.InternalServerException;
                     }
                 }
                 catch (Exception ex)
@@ -77,44 +93,40 @@ namespace InstaServer.BLL.Core
             return pageData;
         }
 
-        private async Task<PageData> GetImagePageData(IDocument document, IParserSettings settings)
+        private PageData GetImagePageData(IDocument document, IParserSettings settings)
         {
             var pageData = new PageData() { PageMediaType = MediaType.Image };
             pageData.PageItems.Add(new PageItem() { ItemMediaType = MediaType.Image });
             pageData.PageItems[0].Link = GetImageElement(document, Constants.ImageKeyWord).Attributes["src"];
             GetImageTags(document, pageData.PageItems[0].Tags);
-            pageData.PageItems[0].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[0].Link);
             return pageData;
         }
 
-        private async Task<PageData> GetVideoPageData(IDocument document, IParserSettings settings)
+        private PageData GetVideoPageData(IDocument document, IParserSettings settings)
         {
             var pageData = new PageData() { PageMediaType = MediaType.Video };
             pageData.PageItems.Add(new PageItem() { ItemMediaType = MediaType.Video });
             pageData.PageItems[0].Link = GetVideoElement(document).Attributes["src"];
             GetVideoTags(document, document, pageData.PageItems[0].Tags);
-            pageData.PageItems[0].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[0].Link);
             return pageData;
         }
-        private async Task<PageData> GetIGTVPageData(IDocument document, IParserSettings settings)
+        private PageData GetIGTVPageData(IDocument document, IParserSettings settings)
         {
             var pageData = new PageData() { PageMediaType = MediaType.Igtv };
             pageData.PageItems.Add(new PageItem() { ItemMediaType = MediaType.Igtv });
             pageData.PageItems[0].Link = GetVideoElement(document).Attributes["src"];
             GetVideoTags(document, document, pageData.PageItems[0].Tags);
-            pageData.PageItems[0].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[0].Link);
             return pageData;
         }
-        private async Task<PageData> GetReelPageData(IDocument document, IParserSettings settings)
+        private PageData GetReelPageData(IDocument document, IParserSettings settings)
         {
             var pageData = new PageData() { PageMediaType = MediaType.Reel };
             pageData.PageItems.Add(new PageItem() { ItemMediaType = MediaType.Reel });
             pageData.PageItems[0].Link = GetVideoElement(document).Attributes["src"];
             GetVideoTags(document, document, pageData.PageItems[0].Tags);
-            pageData.PageItems[0].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[0].Link);
             return pageData;
         }
-        private async Task<PageData> GetCarouselPageData(IDocument document, IParserSettings settings)
+        private PageData GetCarouselPageData(IDocument document, IParserSettings settings)
         {
             var pageData = new PageData() { PageMediaType = MediaType.Carousel };
             IElement nextBtn;
@@ -123,6 +135,7 @@ namespace InstaServer.BLL.Core
             var i = 1;
             while ((nextBtn = document.GetElementByClassName("coreSpriteRightChevron")) != null)
             {
+                Thread.Sleep(TimeSpan.FromSeconds(1));
                 var currentCarouselItems = ul.GetElementsByTagName("li").ToArray();
                 var f = ul.InnerHtml;
                 if (i == 1)
@@ -154,7 +167,6 @@ namespace InstaServer.BLL.Core
                     GetVideoTags(document, carouselItem, pageData.PageItems[i].Tags);
                 }
                 pageData.PageItems[i].Link = element.Attributes["src"];
-                pageData.PageItems[i].File = await FileLoader.GetEncodedFileAsync(pageData.PageItems[i].Link);
                 i++;
             }
             return pageData;
@@ -184,7 +196,7 @@ namespace InstaServer.BLL.Core
         {
             string mainText = null;
             var mainTextContainer = document.GetElementByClassName(Constants.MainTextContainerKeyWord);
-            mainText = mainTextContainer.GetElementsByTagName("span").FirstOrDefault(span => string.IsNullOrEmpty(span.Attributes["class"])).InnerHtml;
+            mainText = mainTextContainer?.GetElementsByTagName("span")?.FirstOrDefault(span => string.IsNullOrEmpty(span.Attributes["class"]))?.InnerHtml;
             return mainText;
         }
 
@@ -202,6 +214,7 @@ namespace InstaServer.BLL.Core
             if(tagBtn != null)
             {
                 tagBtn.Click();
+                Thread.Sleep(TimeSpan.FromSeconds(1));
                 var dialogWindow = document.GetElementByClassName("_1XyCr");
                 foreach (var tag in dialogWindow.GetElementsByClassName("qyrsm").Select(e => e.InnerText))
                 {

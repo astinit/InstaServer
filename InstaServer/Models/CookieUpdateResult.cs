@@ -5,8 +5,9 @@ using System.Threading.Tasks;
 
 namespace InstaServer.Models
 {
-    public class BrowserConfig
+    public class CookieUpdateResult
     {
-        public string SessionId { get; set; }
+        public string Message { get; set; }
+        public Exception Exception { get; set; }
     }
 }

@@ -1,18 +1,30 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
     <PackageTags>9412ee86-c21b-4eb8-bd89-f650fbf44931</PackageTags>
+    <UserSecretsId>2f73a1b3-b7a3-40c1-936f-4b98323dfd6f</UserSecretsId>
+    <CefSharpAnyCpuSupport>true</CefSharpAnyCpuSupport>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="dotnetbrowser.license" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="dotnetbrowser.license" />
+  </ItemGroup>
 
   <ItemGroup>
     <Protobuf Include="Protos\insta.proto" GrpcServices="Server" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWS.Logger.AspNetCore" Version="3.0.1" />
     <PackageReference Include="DotNetBrowser" Version="2.3.0" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.34.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="5.0.1" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.10.9" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
   </ItemGroup>
 
