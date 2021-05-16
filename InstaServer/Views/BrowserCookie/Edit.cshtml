@@ -7,7 +7,7 @@
     <h3>BrowserConfigs</h3>
     <h5 class="text-danger">@TempData["Error"]</h5>
     <h5 class="text-success">@TempData["Success"]</h5>
-    <form asp-controller="BrowserConfig" asp-action="Edit" method="post">
+    <form asp-controller="BrowserCookie" asp-action="Edit" method="post">
         <div class="form-group">
             <label for="SessionId">SessionId</label>
             <input asp-for="SessionId" type="text" value="@Model.SessionId" class="form-control" />
@@ -15,6 +15,10 @@
         <div class="form-group">
             <label for="Ig_did">Ig_did</label>
             <input asp-for="Ig_did" type="text" value="@Model.Ig_did" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label for="Mid">Mid</label>
+            <input asp-for="Mid" type="text" value="@Model.Mid" class="form-control" />
         </div>
         <div class="form-group">
             <label for="Ig_nrcb">Ig_nrcb</label>

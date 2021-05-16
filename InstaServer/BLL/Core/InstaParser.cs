@@ -210,15 +210,20 @@ namespace InstaServer.BLL.Core
 
         private void GetVideoTags(IDocument document, INode node, IList<string> tags)
         {
-            var tagBtn = node.GetElementByClassName("G_hoz");
-            if(tagBtn != null)
+            var tagBtnDiv = node.GetElementByClassName("G_hoz");
+            if(tagBtnDiv != null)
             {
+                var tagBtn = tagBtnDiv.GetElementByTagName("button");
+                tagBtnDiv.Click();
                 tagBtn.Click();
                 Thread.Sleep(TimeSpan.FromSeconds(1));
                 var dialogWindow = document.GetElementByClassName("_1XyCr");
-                foreach (var tag in dialogWindow.GetElementsByClassName("qyrsm").Select(e => e.InnerText))
+                if (dialogWindow != null)
                 {
-                    tags.Add(tag);
+                    foreach (var tag in dialogWindow.GetElementsByClassName("qyrsm").Select(e => e.InnerText))
+                    {
+                        tags.Add(tag);
+                    }
                 }
             }
         }

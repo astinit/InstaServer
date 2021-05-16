@@ -25,39 +25,42 @@ namespace InstaServer.BLL.Helpers
 
         public static IEngine Engine { get; set; }
         public IBrowser Browser { get; private set; }
-        public static void InitEngine()
+        public static async Task InitEngineAsync()
         {
             Engine = EngineFactory.Create(new EngineOptions.Builder().Build());
-            SetCookies(new BrowserCookie()).GetAwaiter().GetResult();
-            //Engine.Network.StartTransactionHandler
-            //    = new Handler<StartTransactionParameters, StartTransactionResponse>(p =>
-            //    {
-            //        IEnumerable<IHttpHeader> headers = p.Headers;
-            //        List<HttpHeader> newHttpHeaders = headers.Cast<HttpHeader>().ToList();
-            //        var oldCookie = newHttpHeaders.FirstOrDefault(h => h.Name.ToLower() == "cookie");
-            //        if(oldCookie != null)
-            //        {
-            //            newHttpHeaders.Remove(oldCookie);
-            //        }
-            //        newHttpHeaders.Add(new HttpHeader("Cookie", $@"{Constants.Ig_did}=A00206A3-496F-4C8A-B46E-259C4055F803; 
-            //            {Constants.Mid}=YCLmhAALAAHndx2hFLh7qBRvkP5d; 
-            //            {Constants.Ig_nrcb}=1;
-            //            {Constants.Shbid}=2379;
-            //            {Constants.Rur}=PRN; 
-            //            {Constants.Shbts}=1613247768.5875483;
-            //            {Constants.Csrftoken}=c7eI4P8H7b7xuUDcIABb8uw62s5pL8cH; 
-            //            {Constants.Ds_user_id}=1678886083;  
-            //            {Constants.SessionId}="));
-            //        return StartTransactionResponse.OverrideHeaders(newHttpHeaders);
-            //    });
+            BrowserCookie = new BrowserCookie();
+            FileInfo fileInf = new FileInfo("cookie.json");
+            if (fileInf.Exists)
+            {
+                BrowserCookie = await ReadCookieFromFile() ?? BrowserCookie;
+                await SetCookiesAsync(BrowserCookie);
+            }
         }
 
-        public static async Task<CookieUpdateResult> SetCookies(BrowserCookie cookie)
+        public static async Task WriteCookieToFile(BrowserCookie cookie)
+        {
+            string json = JsonConvert.SerializeObject(cookie);
+            using var sw = new StreamWriter("cookie.json", false, System.Text.Encoding.Default);
+            await sw.WriteLineAsync(json);
+        }
+
+        private static async Task<BrowserCookie> ReadCookieFromFile()
+        {
+            string json;
+            using (var sr = new StreamReader("cookie.json"))
+            {
+                json = await sr.ReadToEndAsync();
+            }
+            return JsonConvert.DeserializeObject<BrowserCookie>(json);
+        }
+
+        public static async Task<CookieUpdateResult> SetCookiesAsync(BrowserCookie cookie)
         {
             var result = new CookieUpdateResult();
             foreach (var prop in cookie.GetType().GetProperties())
             {
-                result = await SetCookie(prop.Name.ToLower(), (string)prop.GetValue(cookie));
+                var value = prop.GetValue(cookie) as string ?? "";
+                result = await SetCookie(prop.Name.ToLower(), value);
             }
             BrowserCookie = cookie;
             return result;

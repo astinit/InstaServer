@@ -8,14 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="dotnetbrowser.license" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="dotnetbrowser.license" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Protobuf Include="Protos\insta.proto" GrpcServices="Server" />
   </ItemGroup>
 
@@ -30,6 +22,12 @@
 
   <ItemGroup>
     <Folder Include="wwwroot\lib\bootstrap\dist\css\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="dotnetbrowser.license">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
